@@ -4,7 +4,9 @@ const http = require("http");
 const app = express();
 const server = http.createServer(app);
 const wss = new Server({ server });
+
 let clients = [];
+let roomHistory = {}; 
 
 app.get("/", (req, res) => {
     res.send("Server Online");
@@ -21,29 +23,35 @@ wss.on("connection", (ws) => {
             
             if (data.type === "join") {
                 ws.username = data.username;
-                broadcast(ws.room, "System", ws.username + " connected.");
+                ws.room = data.room;
+
+                if (roomHistory[ws.room] && roomHistory[ws.room].length > 0) {
+                    roomHistory[ws.room].forEach(msg => {
+                        ws.send(JSON.stringify(msg));
+                    });
+                }
+                
+                if (ws.room !== "global") {
+                   broadcast(ws.room, "System", ws.username + " connected.");
+                }
             } 
             else if (data.type === "chat") {
-                const text = data.text;
+                const targetRoom = data.room || ws.room;
                 
-                if (text.startsWith("/join ")) {
-                    const newRoom = text.split(" ")[1];
-                    ws.room = newRoom;
-                    ws.send(JSON.stringify({ user: "System", text: "Joined room: " + newRoom }));
-                } 
-                else if (text.startsWith("/w ")) {
-                    const parts = text.split(" ");
-                    const targetName = parts[1];
-                    const pmText = parts.slice(2).join(" ");
-                    const target = clients.find(c => c.username === targetName);
-                    if (target) {
-                        target.send(JSON.stringify({ user: "[PM] " + ws.username, text: pmText }));
-                        ws.send(JSON.stringify({ user: "[PM] -> " + targetName, text: pmText }));
-                    }
-                } 
-                else {
-                    broadcast(ws.room, ws.username, text);
+                const msgData = { 
+                    user: data.username || ws.username, 
+                    text: data.text 
+                };
+                
+                if (!roomHistory[targetRoom]) {
+                    roomHistory[targetRoom] = [];
                 }
+                roomHistory[targetRoom].push(msgData);
+                if (roomHistory[targetRoom].length > 50) {
+                    roomHistory[targetRoom].shift();
+                }
+                
+                broadcast(targetRoom, msgData.user, msgData.text);
             }
         } catch (e) {}
     });

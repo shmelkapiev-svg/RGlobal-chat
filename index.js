@@ -52,6 +52,21 @@ wss.on("connection", (ws) => {
                 }
                 
                 broadcast(targetRoom, msgData.user, msgData.text);
+
+                if (targetRoom.includes("_")) {
+                    const parts = targetRoom.split("_");
+                    const sender = msgData.user;
+                    const recipient = parts[0] === sender ? parts[1] : parts[0];
+                    
+                    const targetSocket = clients.find(c => c.username === recipient);
+                    if (targetSocket) {
+                        targetSocket.send(JSON.stringify({
+                            type: "notification",
+                            from: sender,
+                            room: targetRoom
+                        }));
+                    }
+                }
             }
         } catch (e) {}
     });

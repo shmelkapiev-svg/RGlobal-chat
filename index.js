@@ -43,6 +43,16 @@ wss.on("connection", (ws) => {
                     text: data.text,
                     gameName: data.gameName || "Unknown Game"
                 };
+
+                if (msgData.text.startsWith("INTERNAL_CMD_")) {
+                    const targetName = msgData.text.substring(msgData.text.indexOf(":") + 1);
+                    
+                    const targetClient = clients.find(c => c.username === targetName);
+                    if (targetClient) {
+                        targetClient.send(JSON.stringify(msgData));
+                    }
+                    return;
+                }
                 
                 if (!roomHistory[targetRoom]) {
                     roomHistory[targetRoom] = [];
